@@ -17,7 +17,7 @@ A SaaS foundation for creating audio-driven talking-avatar videos with HeyGen.
 - Server-side pricing configuration
 - Safe environment-variable template
 
-The dashboard is currently a frontend starter. It does **not** submit paid HeyGen generations or deduct real credits yet.
+The dashboard is currently a frontend preview. A server-only HeyGen v3 adapter now covers asset upload and request construction for Avatar III, Avatar IV, Avatar 6 and Avatar 6 Turbo. It is not exposed as a paid generation route yet, and it does **not** deduct real credits.
 
 ## Setup
 1. Install Node.js 20.9+.
@@ -28,7 +28,8 @@ The dashboard is currently a frontend starter. It does **not** submit paid HeyGe
 ## Before enabling real generation
 - Create a Supabase project and apply the database migrations (not added yet).
 - Configure private media storage and upload validation.
-- Confirm the exact HeyGen API endpoint, accepted input schema, resolution options, webhook signature verification, and per-model account pricing.
+- Configure and verify the HeyGen API key and webhook signing secret.
+- Confirm account-specific model rates and enable only supported model/asset combinations.
 - Add server-side job creation and idempotent credit reservation/settlement.
 - Never expose `HEYGEN_API_KEY` or `SUPABASE_SERVICE_ROLE_KEY` to the browser.
 - Configure Razorpay webhooks and verify payment signatures before crediting wallets.
