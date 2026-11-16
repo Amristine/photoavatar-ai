@@ -22,10 +22,10 @@ function rate(value: string | undefined, fallback: number): number {
 }
 
 export function getModelPricing(): ModelPricing[] {
-  const avatar6 = readRate(process.env.HEYGEN_AVATAR_6_1080P_USD_PER_MIN);
-  const avatar6_2k = readRate(process.env.HEYGEN_AVATAR_6_2K_USD_PER_MIN);
-  const turbo1080 = readRate(process.env.HEYGEN_AVATAR_6_TURBO_1080P_USD_PER_MIN);
-  const turbo2k = readRate(process.env.HEYGEN_AVATAR_6_TURBO_2K_USD_PER_MIN);
+  const avatar6 = rate(process.env.HEYGEN_AVATAR_6_1080P_USD_PER_MIN, 6.00);
+  const avatar6_2k = rate(process.env.HEYGEN_AVATAR_6_2K_USD_PER_MIN, 8.70);
+  const turbo1080 = rate(process.env.HEYGEN_AVATAR_6_TURBO_1080P_USD_PER_MIN, 3.00);
+  const turbo2k = rate(process.env.HEYGEN_AVATAR_6_TURBO_2K_USD_PER_MIN, 5.25);
 
   return [
     {
@@ -51,7 +51,7 @@ export function getModelPricing(): ModelPricing[] {
       name: "Avatar 6",
       description: "Premium photo-to-video generation with motion prompts and 1080p or 2K output.",
       rates: { ...(avatar6 !== null ? { "1080p": avatar6 } : {}), ...(avatar6_2k !== null ? { "2K": avatar6_2k } : {}) },
-      status: avatar6 === null || avatar6_2k === null ? "rate-required" : "configured",
+      status: "configured",
       tag: "Premium quality",
       tier: "Premium"
     },
@@ -60,7 +60,7 @@ export function getModelPricing(): ModelPricing[] {
       name: "Avatar 6 Turbo",
       description: "Faster premium generation at a lower provider rate.",
       rates: { ...(turbo1080 !== null ? { "1080p": turbo1080 } : {}), ...(turbo2k !== null ? { "2K": turbo2k } : {}) },
-      status: turbo1080 === null || turbo2k === null ? "rate-required" : "configured",
+      status: "configured",
       tag: "Premium · Faster",
       tier: "Premium"
     }
