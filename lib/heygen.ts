@@ -53,17 +53,25 @@ export async function createAvatar6Job(input: {
   imageAssetId: string;
   audioAssetId: string;
   resolution?: "1080p" | "2k";
+  aspectRatio?: OutputRatio;
   motionPrompt?: string;
   motionExpressiveness?: "default" | "less";
   callbackUrl?: string;
 }): Promise<HeyGenVideoJob> {
+  const resolution = input.resolution ?? "1080p";
+  const ratio = input.aspectRatio ?? "9:16";
+  const dimensions = resolution === "2k"
+    ? { "9:16": [1620, 2880], "16:9": [2880, 1620], "1:1": [1620, 1620] }[ratio]
+    : { "9:16": [1080, 1920], "16:9": [1920, 1080], "1:1": [1080, 1080] }[ratio];
   const response = await heygenFetch<HeyGenEnvelope<HeyGenVideoJob>>("/v3/models/avatars", {
     method: "POST",
     body: JSON.stringify({
       model: input.model,
       reference_images: [{ type: "asset_id", asset_id: input.imageAssetId }],
       audio: { type: "asset_id", asset_id: input.audioAssetId },
-      resolution: input.resolution ?? "1080p",
+      resolution,
+      output_width: dimensions[0],
+      output_height: dimensions[1],
       ...(input.motionPrompt ? { motion_prompt: input.motionPrompt } : {}),
       ...(input.motionExpressiveness ? { motion_expressiveness: input.motionExpressiveness } : {}),
       ...(input.callbackUrl ? { callback_url: input.callbackUrl } : {})
