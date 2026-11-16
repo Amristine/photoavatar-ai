@@ -10,8 +10,6 @@ export async function GET() {
     currency: "INR",
     usdToInr: Number.isFinite(usdToInr) ? usdToInr : 85,
     creditsPerInr: Number.isFinite(creditsPerInr) ? creditsPerInr : 1,
-    models: getModelPricing().map(({ id, name, description, usdPerMinute, status, tag }) => ({
-      id, name, description, usdPerMinute, status, tag
-    }))
+    models: getModelPricing()
   });
 }
