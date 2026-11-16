@@ -17,13 +17,14 @@ function apiKey() {
 }
 
 async function heygenFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.set("x-api-key", apiKey());
+  if (!(init.body instanceof FormData) && !headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
   const response = await fetch(`${HEYGEN_BASE_URL}${path}`, {
     ...init,
-    headers: {
-      "x-api-key": apiKey(),
-      ...(init.body instanceof FormData ? {} : { "content-type": "application/json" }),
-      ...init.headers
-    },
+    headers,
     cache: "no-store"
   });
   const payload = await response.json().catch(() => ({}));
