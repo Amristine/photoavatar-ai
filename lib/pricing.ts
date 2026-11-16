@@ -1,40 +1,80 @@
 export type ModelId = "avatar-iii" | "avatar-iv" | "avatar-6" | "avatar-6-turbo";
+export type OutputResolution = "720p" | "1080p" | "2K";
 
 export type ModelPricing = {
   id: ModelId;
   name: string;
   description: string;
-  usdPerMinute: number | null;
+  rates: Partial<Record<OutputResolution, number>>;
   status: "configured" | "rate-required";
   tag: string;
+  tier: "Budget" | "Standard" | "Premium";
 };
 
 function readRate(value: string | undefined): number | null {
   if (!value?.trim()) return null;
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function rate(value: string | undefined, fallback: number): number {
+  return readRate(value) ?? fallback;
 }
 
 export function getModelPricing(): ModelPricing[] {
-  const iii = readRate(process.env.HEYGEN_AVATAR_III_USD_PER_MIN) ?? 0.99;
-  const iv = readRate(process.env.HEYGEN_AVATAR_IV_USD_PER_MIN) ?? 2.31;
-  const six = readRate(process.env.HEYGEN_AVATAR_6_USD_PER_MIN);
-  const turbo = readRate(process.env.HEYGEN_AVATAR_6_TURBO_USD_PER_MIN);
+  const avatar6 = readRate(process.env.HEYGEN_AVATAR_6_1080P_USD_PER_MIN);
+  const avatar6_2k = readRate(process.env.HEYGEN_AVATAR_6_2K_USD_PER_MIN);
+  const turbo1080 = readRate(process.env.HEYGEN_AVATAR_6_TURBO_1080P_USD_PER_MIN);
+  const turbo2k = readRate(process.env.HEYGEN_AVATAR_6_TURBO_2K_USD_PER_MIN);
+
   return [
-    { id: "avatar-iii", name: "Avatar III", description: "Economical photo avatar generation", usdPerMinute: iii, status: "configured", tag: "Economy" },
-    { id: "avatar-iv", name: "Avatar IV", description: "Expressive photo avatar generation", usdPerMinute: iv, status: "configured", tag: "Advanced" },
-    { id: "avatar-6", name: "Avatar 6", description: "Motion-prompt driven avatar model", usdPerMinute: six, status: six === null ? "rate-required" : "configured", tag: "Latest" },
-    { id: "avatar-6-turbo", name: "Avatar 6 Turbo", description: "Turbo generation mode", usdPerMinute: turbo, status: turbo === null ? "rate-required" : "configured", tag: "Turbo" }
+    {
+      id: "avatar-iii",
+      name: "Avatar 3 Photo",
+      description: "Affordable talking videos from a single photo and your recorded voice. No custom motion prompt.",
+      rates: { "720p": rate(process.env.HEYGEN_AVATAR_III_USD_PER_MIN, 0.99), "1080p": rate(process.env.HEYGEN_AVATAR_III_USD_PER_MIN, 0.99) },
+      status: "configured",
+      tag: "Best value",
+      tier: "Budget"
+    },
+    {
+      id: "avatar-iv",
+      name: "Avatar 4 Photo",
+      description: "More expressive photo animation with support for motion direction.",
+      rates: { "720p": rate(process.env.HEYGEN_AVATAR_IV_USD_PER_MIN, 2.31), "1080p": rate(process.env.HEYGEN_AVATAR_IV_USD_PER_MIN, 2.31) },
+      status: "configured",
+      tag: "Balanced",
+      tier: "Standard"
+    },
+    {
+      id: "avatar-6",
+      name: "Avatar 6",
+      description: "Premium photo-to-video generation with motion prompts and 1080p or 2K output.",
+      rates: { ...(avatar6 !== null ? { "1080p": avatar6 } : {}), ...(avatar6_2k !== null ? { "2K": avatar6_2k } : {}) },
+      status: avatar6 === null || avatar6_2k === null ? "rate-required" : "configured",
+      tag: "Premium quality",
+      tier: "Premium"
+    },
+    {
+      id: "avatar-6-turbo",
+      name: "Avatar 6 Turbo",
+      description: "Faster premium generation at a lower provider rate.",
+      rates: { ...(turbo1080 !== null ? { "1080p": turbo1080 } : {}), ...(turbo2k !== null ? { "2K": turbo2k } : {}) },
+      status: turbo1080 === null || turbo2k === null ? "rate-required" : "configured",
+      tag: "Premium · Faster",
+      tier: "Premium"
+    }
   ];
 }
 
-export function estimateGeneration(model: ModelId, durationSeconds: number) {
+export function estimateGeneration(model: ModelId, durationSeconds: number, resolution: OutputResolution = "1080p") {
   const pricing = getModelPricing().find((item) => item.id === model);
+  const usdPerMinute = pricing?.rates[resolution];
   const fx = readRate(process.env.USD_TO_INR) ?? 85;
   const creditsPerInr = readRate(process.env.CREDITS_PER_INR) ?? 1;
   const margin = readRate(process.env.CUSTOMER_MARGIN_MULTIPLIER) ?? 1;
-  if (!pricing || pricing.usdPerMinute === null) return null;
-  const providerCostInr = (Math.max(0, durationSeconds) / 60) * pricing.usdPerMinute * fx;
+  if (!pricing || usdPerMinute === undefined) return null;
+  const providerCostInr = (Math.max(0, durationSeconds) / 60) * usdPerMinute * fx;
   const customerCredits = Math.ceil(providerCostInr * creditsPerInr * margin);
-  return { providerCostInr, customerCredits, currencyRate: fx };
+  return { providerCostInr, customerCredits, currencyRate: fx, usdPerMinute };
 }
