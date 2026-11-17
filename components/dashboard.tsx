@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Activity, Bell, Check, ChevronDown, CircleHelp, Clapperboard, Clock3,
   FileAudio, FileImage, Film, Layers3, LayoutDashboard, Settings2,
@@ -13,6 +13,15 @@ type Props = {
   creditConfig: { usdToInr: number; creditsPerInr: number; marginMultiplier: number };
 };
 
+const DRAFT_KEY = "photoavatar-ai-creator-draft";
+const DEFAULT_MOTION = "Speak naturally to camera with relaxed shoulders, subtle head movement, expressive facial movement and gentle conversational hand gestures. Keep gestures realistic and avoid sudden movements.";
+type CreatorDraft = { selectedModel: ModelId; duration: number; aspectRatio: "9:16" | "16:9" | "1:1"; photoName: string; audioName: string; script: string; motion: string; resolution: string };
+
+function readDraft(): Partial<CreatorDraft> {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}"); } catch { return {}; }
+}
+
 const nav = [
   { label: "Overview", icon: LayoutDashboard, active: true },
   { label: "Create video", icon: Clapperboard },
@@ -22,14 +31,15 @@ const nav = [
 ];
 
 export default function Dashboard({ models, creditConfig }: Props) {
-  const [selectedModel, setSelectedModel] = useState<ModelId>("avatar-iii");
-  const [duration, setDuration] = useState(60);
-  const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9" | "1:1">("9:16");
-  const [photoName, setPhotoName] = useState("");
-  const [audioName, setAudioName] = useState("");
-  const [script, setScript] = useState("");
-  const [motion, setMotion] = useState("Speak naturally to camera with relaxed shoulders, subtle head movement, expressive facial movement and gentle conversational hand gestures. Keep gestures realistic and avoid sudden movements.");
-  const [resolution, setResolution] = useState("1080p");
+  const [initialDraft] = useState<Partial<CreatorDraft>>(readDraft);
+  const [selectedModel, setSelectedModel] = useState<ModelId>(initialDraft.selectedModel ?? "avatar-iii");
+  const [duration, setDuration] = useState(initialDraft.duration ?? 60);
+  const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9" | "1:1">(initialDraft.aspectRatio ?? "9:16");
+  const [photoName, setPhotoName] = useState(initialDraft.photoName ?? "");
+  const [audioName, setAudioName] = useState(initialDraft.audioName ?? "");
+  const [script, setScript] = useState(initialDraft.script ?? "");
+  const [motion, setMotion] = useState(initialDraft.motion ?? DEFAULT_MOTION);
+  const [resolution, setResolution] = useState(initialDraft.resolution ?? "1080p");
   const [notice, setNotice] = useState("");
   const selected = models.find((m) => m.id === selectedModel) ?? models[0];
   const supportedResolutions = selectedModel === "avatar-iii" || selectedModel === "avatar-iv" ? ["720p", "1080p"] : ["1080p", "2K"];
@@ -37,8 +47,24 @@ export default function Dashboard({ models, creditConfig }: Props) {
   const usdPerMinute = selected?.rates[effectiveResolution as OutputResolution];
   const estimatedInr = usdPerMinute === undefined ? null : (duration / 60) * usdPerMinute * creditConfig.usdToInr * creditConfig.marginMultiplier;
   const estimatedCredits = estimatedInr === null ? null : Math.ceil(estimatedInr * creditConfig.creditsPerInr);
+  const hasDraft = Boolean(photoName || audioName || script.trim() || selectedModel !== "avatar-iii" || duration !== 60 || aspectRatio !== "9:16" || resolution !== "1080p");
 
-  const onGenerate = () => setNotice("Video generation is not connected yet. Complete authentication, secure uploads and server-side HeyGen job handling before enabling generation.");
+  useEffect(() => {
+    const draft: CreatorDraft = { selectedModel, duration, aspectRatio, photoName, audioName, script, motion, resolution };
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch { setNotice("Could not save this draft in browser storage. Export or copy your script before leaving this page."); }
+  }, [selectedModel, duration, aspectRatio, photoName, audioName, script, motion, resolution]);
+
+  useEffect(() => {
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      if (!hasDraft) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [hasDraft]);
+
+  const onGenerate = () => setNotice("Video generation is not connected yet. Your creator settings are automatically saved in this browser. Once generation is connected, completed videos will be saved locally as well.");
 
   return (
     <main className="min-h-screen bg-[#09090d] text-[#f4f4f8]">
@@ -67,6 +93,7 @@ export default function Dashboard({ models, creditConfig }: Props) {
             <div className="flex items-center gap-3"><div className="hidden items-center gap-2 rounded-full border border-[#2a2a36] bg-[#111117] px-3 py-2 sm:flex"><Wallet size={14} className="text-violet-300"/><span className="text-xs text-[#aaaaba]">Wallet not connected</span></div><button aria-label="Notifications" className="rounded-xl border border-[#292936] p-2.5 text-[#9999aa]"><Bell size={16}/></button></div>
           </header>
           <div className="mx-auto max-w-[1440px] px-5 py-7 md:px-8 md:py-9">
+            <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[.06] px-3 py-2 text-[10px] text-emerald-200"><ShieldCheck size={14}/> Draft auto-saves in this browser. Refreshing or closing the tab will prompt before leaving when you have entered data.</div>
             <div className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
               <div><div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.18em] text-violet-300"><span className="h-1.5 w-1.5 rounded-full bg-violet-400"/> AI video generation</div><h1 className="text-2xl font-semibold tracking-tight md:text-[30px]">Create your next video</h1><p className="mt-2 max-w-xl text-sm leading-6 text-[#9292a3]">Bring a photo to life. Add your own audio and guide the motion to create a presenter video.</p></div>
               <div className="flex items-center gap-2 rounded-xl border border-[#292936] bg-[#111117] px-3 py-2.5 text-[11px] text-[#a3a3b2]"><ShieldCheck size={15} className="text-emerald-400"/> Your HeyGen API key stays server-side</div>
