@@ -78,3 +78,10 @@ export function estimateGeneration(model: ModelId, durationSeconds: number, reso
   const customerCredits = Math.ceil(providerCostInr * creditsPerInr * margin);
   return { providerCostInr, customerCredits, currencyRate: fx, usdPerMinute };
 }
+export function getCreditConfig() {
+  return {
+    usdToInr: readRate(process.env.USD_TO_INR) ?? 85,
+    creditsPerInr: readRate(process.env.CREDITS_PER_INR) ?? 1,
+    marginMultiplier: readRate(process.env.CUSTOMER_MARGIN_MULTIPLIER) ?? 1
+  };
+}
