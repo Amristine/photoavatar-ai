@@ -6,9 +6,12 @@ import {
   FileAudio, FileImage, Film, Layers3, LayoutDashboard, Settings2,
   ShieldCheck, Sparkles, UploadCloud, Video, Wallet, WandSparkles, X
 } from "lucide-react";
-import type { ModelPricing, ModelId } from "@/lib/pricing";
+import type { ModelPricing, ModelId, OutputResolution } from "@/lib/pricing";
 
-type Props = { models: ModelPricing[] };
+type Props = {
+  models: ModelPricing[];
+  creditConfig: { usdToInr: number; creditsPerInr: number; marginMultiplier: number };
+};
 
 const nav = [
   { label: "Overview", icon: LayoutDashboard, active: true },
@@ -18,7 +21,7 @@ const nav = [
   { label: "Credits & billing", icon: Wallet }
 ];
 
-export default function Dashboard({ models }: Props) {
+export default function Dashboard({ models, creditConfig }: Props) {
   const [selectedModel, setSelectedModel] = useState<ModelId>("avatar-iii");
   const [duration, setDuration] = useState(60);
   const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9" | "1:1">("9:16");
@@ -31,6 +34,9 @@ export default function Dashboard({ models }: Props) {
   const selected = models.find((m) => m.id === selectedModel) ?? models[0];
   const supportedResolutions = selectedModel === "avatar-iii" || selectedModel === "avatar-iv" ? ["720p", "1080p"] : ["1080p", "2K"];
   const effectiveResolution = supportedResolutions.includes(resolution) ? resolution : "1080p";
+  const usdPerMinute = selected?.rates[effectiveResolution as OutputResolution];
+  const estimatedInr = usdPerMinute === undefined ? null : (duration / 60) * usdPerMinute * creditConfig.usdToInr * creditConfig.marginMultiplier;
+  const estimatedCredits = estimatedInr === null ? null : Math.ceil(estimatedInr * creditConfig.creditsPerInr);
 
   const onGenerate = () => setNotice("Video generation is not connected yet. Complete authentication, secure uploads and server-side HeyGen job handling before enabling generation.");
 
@@ -117,6 +123,11 @@ export default function Dashboard({ models }: Props) {
                     <div className="flex justify-between"><span className="text-[#9292a3]">Output resolution</span><span>{effectiveResolution}</span></div>
                     <div className="flex justify-between"><span className="text-[#9292a3]">Aspect ratio</span><span>{aspectRatio}</span></div>
                     <div className="flex justify-between"><span className="text-[#9292a3]">Video length</span><span className="font-semibold">{duration >= 60 ? `${Math.floor(duration / 60)}m${duration % 60 ? ` ${duration % 60}s` : ""}` : `${duration}s`}</span></div>
+                    <div className="mt-4 rounded-xl border border-violet-400/20 bg-violet-500/[.07] p-4">
+                      <div className="mb-3 flex items-center justify-between"><span className="text-[11px] font-semibold text-violet-200">Estimated generation cost</span><span className="text-[9px] text-[#858596]">Per video</span></div>
+                      {estimatedInr === null || estimatedCredits === null ? <p className="text-[11px] text-[#aaaaba]">Pricing is not configured for this model and resolution.</p> : <><div className="flex items-baseline justify-between"><span className="text-[11px] text-[#9292a3]">Estimated price</span><span className="text-lg font-bold">₹{estimatedInr.toFixed(2)}</span></div><div className="mt-2 flex items-baseline justify-between"><span className="text-[11px] text-[#9292a3]">Credits required</span><span className="text-sm font-semibold text-violet-200">{estimatedCredits.toLocaleString("en-IN")} credits</span></div></>}
+                      <p className="mt-3 text-[9px] leading-4 text-[#777789]">Estimate updates with your model, resolution and video length. Final usage may vary by provider.</p>
+                    </div>
                   </div>
                   <button onClick={onGenerate} className="btn-primary mt-5 flex w-full items-center justify-center gap-2"><Sparkles size={15}/> Generate video <span className="text-violet-200/80">→</span></button>
                   <p className="mt-3 text-center text-[9px] leading-4 text-[#777789]">Preview only. No paid API request is made yet.</p>
