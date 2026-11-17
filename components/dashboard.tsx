@@ -21,6 +21,7 @@ const nav = [
 export default function Dashboard({ models }: Props) {
   const [selectedModel, setSelectedModel] = useState<ModelId>("avatar-iii");
   const [duration, setDuration] = useState(60);
+  const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9" | "1:1">("9:16");
   const [photoName, setPhotoName] = useState("");
   const [audioName, setAudioName] = useState("");
   const [script, setScript] = useState("");
@@ -100,9 +101,10 @@ export default function Dashboard({ models }: Props) {
                 </section>
                 <section className="panel p-5 md:p-6">
                   <div className="mb-4 text-sm font-semibold">04 · Output settings</div>
-                  <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <div><label className="mb-2 block text-[10px] text-[#9292a3]">Resolution</label><select value={effectiveResolution} onChange={(e) => setResolution(e.target.value)} className="field text-xs">{supportedResolutions.map((res) => <option key={res} value={res}>{res}</option>)}</select></div>
-                    <div><label className="mb-2 block text-[10px] text-[#9292a3]">Aspect ratio</label><select className="field text-xs"><option>9:16 · Reels / Shorts</option><option>16:9 · YouTube</option><option>1:1 · Square</option></select></div>
+                    <div><label className="mb-2 block text-[10px] text-[#9292a3]">Aspect ratio</label><select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value as "9:16" | "16:9" | "1:1")} className="field text-xs"><option value="9:16">9:16 · Reels / Shorts</option><option value="16:9">16:9 · YouTube</option><option value="1:1">1:1 · Square</option></select></div>
+                    <div><label className="mb-2 block text-[10px] text-[#9292a3]">Video length</label><select value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="field text-xs"><option value={15}>15 seconds</option><option value={30}>30 seconds</option><option value={45}>45 seconds</option><option value={60}>1 minute</option><option value={90}>1 minute 30 seconds</option><option value={120}>2 minutes</option><option value={180}>3 minutes</option></select></div>
                     <div><label className="mb-2 block text-[10px] text-[#9292a3]">Frame rate</label><select className="field text-xs"><option>30 FPS</option><option>25 FPS</option></select></div>
                   </div>
                 </section>
@@ -113,7 +115,8 @@ export default function Dashboard({ models }: Props) {
                   <div className="space-y-4 text-xs">
                     <div className="flex justify-between"><span className="text-[#9292a3]">Selected model</span><span>{selected?.name}</span></div>
                     <div className="flex justify-between"><span className="text-[#9292a3]">Output resolution</span><span>{effectiveResolution}</span></div>
-                    <div><div className="mb-2 flex items-center justify-between"><label className="font-medium">Audio duration</label><span className="font-semibold">{duration} sec</span></div><input type="range" min="30" max="180" step="15" value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="w-full accent-violet-500"/><div className="mt-1 flex justify-between text-[9px] text-[#777789]"><span>30 sec</span><span>3 min</span></div></div>
+                    <div className="flex justify-between"><span className="text-[#9292a3]">Aspect ratio</span><span>{aspectRatio}</span></div>
+                    <div className="flex justify-between"><span className="text-[#9292a3]">Video length</span><span className="font-semibold">{duration >= 60 ? `${Math.floor(duration / 60)}m${duration % 60 ? ` ${duration % 60}s` : ""}` : `${duration}s`}</span></div>
                   </div>
                   <button onClick={onGenerate} className="btn-primary mt-5 flex w-full items-center justify-center gap-2"><Sparkles size={15}/> Generate video <span className="text-violet-200/80">→</span></button>
                   <p className="mt-3 text-center text-[9px] leading-4 text-[#777789]">Preview only. No paid API request is made yet.</p>
