@@ -7,6 +7,7 @@ import {
   ShieldCheck, Sparkles, UploadCloud, Video, Wallet, WandSparkles, X
 } from "lucide-react";
 import type { ModelPricing, ModelId, OutputResolution } from "@/lib/pricing";
+import { deleteLocalVideo, getLocalVideo, listLocalVideos, type LocalVideoMetadata } from "@/lib/local-video-storage";
 
 type Props = {
   models: ModelPricing[];
@@ -41,6 +42,58 @@ export default function Dashboard({ models, creditConfig }: Props) {
   const [motion, setMotion] = useState(initialDraft.motion ?? DEFAULT_MOTION);
   const [resolution, setResolution] = useState(initialDraft.resolution ?? "1080p");
   const [notice, setNotice] = useState("");
+  const [activeView, setActiveView] = useState<"create" | "videos">("create");
+  const [savedVideos, setSavedVideos] = useState<LocalVideoMetadata[]>([]);
+  const [videoUrls, setVideoUrls] = useState<Record<string, string>>({});
+  const [videosLoading, setVideosLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadVideos = async () => {
+      setVideosLoading(true);
+      try {
+        const items = listLocalVideos();
+        const urls: Record<string, string> = {};
+        for (const item of items) {
+          const blob = await getLocalVideo(item.id);
+          if (blob) urls[item.id] = URL.createObjectURL(blob);
+        }
+        if (!cancelled) {
+          setSavedVideos(items.filter((item) => Boolean(urls[item.id])));
+          setVideoUrls(urls);
+        } else {
+          Object.values(urls).forEach(URL.revokeObjectURL);
+        }
+      } catch {
+        if (!cancelled) setNotice("Could not load locally saved videos. Check this browser's storage permissions.");
+      } finally {
+        if (!cancelled) setVideosLoading(false);
+      }
+    };
+    loadVideos();
+    return () => {
+      cancelled = true;
+      setVideoUrls((current) => {
+        Object.values(current).forEach(URL.revokeObjectURL);
+        return {};
+      });
+    };
+  }, []);
+
+  const removeSavedVideo = async (id: string) => {
+    try {
+      await deleteLocalVideo(id);
+      setVideoUrls((current) => {
+        if (current[id]) URL.revokeObjectURL(current[id]);
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+      setSavedVideos((current) => current.filter((video) => video.id !== id));
+    } catch {
+      setNotice("Could not delete this video from browser storage.");
+    }
+  };
   const selected = models.find((m) => m.id === selectedModel) ?? models[0];
   const supportedResolutions = selectedModel === "avatar-iii" || selectedModel === "avatar-iv" ? ["720p", "1080p"] : ["1080p", "2K"];
   const effectiveResolution = supportedResolutions.includes(resolution) ? resolution : "1080p";
@@ -76,7 +129,7 @@ export default function Dashboard({ models, creditConfig }: Props) {
           </div>
           <div className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[.18em] text-[#686879]">Workspace</div>
           <nav className="space-y-1">
-            {nav.map((item) => <button key={item.label} onClick={() => setNotice(item.label === "Create video" ? "You are on the video creation workspace." : item.label + " will be available in a later dashboard milestone.")} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[13px] ${item.active ? "border border-violet-500/20 bg-violet-500/10 font-semibold text-violet-200" : "text-[#9999aa] hover:bg-white/[.04]"}`}><item.icon size={17}/>{item.label}</button>)}
+            {nav.map((item) => <button key={item.label} onClick={() => item.label === "My videos" ? setActiveView("videos") : item.label === "Create video" ? setActiveView("create") : setNotice(item.label + " will be available in a later dashboard milestone.")} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[13px] ${item.active ? "border border-violet-500/20 bg-violet-500/10 font-semibold text-violet-200" : "text-[#9999aa] hover:bg-white/[.04]"}`}><item.icon size={17}/>{item.label}</button>)}
           </nav>
           <div className="mt-auto space-y-4">
             <div className="rounded-2xl border border-[#292936] bg-[#111117] p-4">
@@ -93,6 +146,27 @@ export default function Dashboard({ models, creditConfig }: Props) {
             <div className="flex items-center gap-3"><div className="hidden items-center gap-2 rounded-full border border-[#2a2a36] bg-[#111117] px-3 py-2 sm:flex"><Wallet size={14} className="text-violet-300"/><span className="text-xs text-[#aaaaba]">Wallet not connected</span></div><button aria-label="Notifications" className="rounded-xl border border-[#292936] p-2.5 text-[#9999aa]"><Bell size={16}/></button></div>
           </header>
           <div className="mx-auto max-w-[1440px] px-5 py-7 md:px-8 md:py-9">
+            {activeView === "videos" ? (
+              <section className="panel p-5 md:p-6">
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                  <div><h1 className="text-2xl font-semibold">My videos</h1><p className="mt-2 text-sm text-[#9292a3]">Completed videos saved in this browser on this device.</p></div>
+                  <button onClick={() => setActiveView("create")} className="btn-primary px-4 py-2 text-xs">Create video</button>
+                </div>
+                {videosLoading ? <p className="py-10 text-center text-sm text-[#858596]">Loading saved videos…</p> : savedVideos.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-[#393846] px-5 py-14 text-center"><Film className="mx-auto mb-3 text-violet-300" size={28}/><p className="text-sm font-semibold">No saved videos yet</p><p className="mt-2 text-xs text-[#858596]">When a completed video is saved on this device, it will appear here.</p></div>
+                ) : (
+                  <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                    {savedVideos.map((video) => <article key={video.id} className="overflow-hidden rounded-xl border border-[#30303c] bg-[#0d0d13]">
+                      {videoUrls[video.id] && <video src={videoUrls[video.id]} controls preload="metadata" className="aspect-video w-full bg-black"/>}
+                      <div className="p-4"><div className="truncate text-sm font-semibold">{video.name}</div><div className="mt-2 text-[10px] text-[#858596]">{new Date(video.createdAt).toLocaleString()} · {(video.size / (1024 * 1024)).toFixed(1)} MB</div>
+                        <div className="mt-4 flex gap-2"><a href={videoUrls[video.id]} download={video.name} className="flex-1 rounded-lg bg-violet-600 px-3 py-2 text-center text-xs font-semibold text-white">Download</a><button onClick={() => removeSavedVideo(video.id)} className="rounded-lg border border-[#393846] px-3 py-2 text-xs text-red-300">Delete</button></div>
+                      </div>
+                    </article>)}
+                  </div>
+                )}
+                <p className="mt-6 text-[10px] leading-5 text-[#777789]">Videos are stored in this browser's IndexedDB. Clearing site data, using another browser/device, or browser storage eviction can remove them. Download important videos as a backup.</p>
+              </section>
+            ) : <>
             <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[.06] px-3 py-2 text-[10px] text-emerald-200"><ShieldCheck size={14}/> Draft auto-saves in this browser. Refreshing or closing the tab will prompt before leaving when you have entered data.</div>
             <div className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
               <div><div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.18em] text-violet-300"><span className="h-1.5 w-1.5 rounded-full bg-violet-400"/> AI video generation</div><h1 className="text-2xl font-semibold tracking-tight md:text-[30px]">Create your next video</h1><p className="mt-2 max-w-xl text-sm leading-6 text-[#9292a3]">Bring a photo to life. Add your own audio and guide the motion to create a presenter video.</p></div>
@@ -163,6 +237,7 @@ export default function Dashboard({ models, creditConfig }: Props) {
                 <div className="flex items-start gap-2 px-1 text-[10px] leading-5 text-[#777789]"><CircleHelp size={13} className="mt-0.5 shrink-0"/> Only upload images and audio you own or are authorized to use. The avatar subject must consent to AI representation.</div>
               </aside>
             </div>
+            </>}
             <footer className="mt-10 flex flex-col justify-between gap-2 border-t border-[#252530] pt-5 text-[10px] text-[#6f6f80] sm:flex-row"><span>© 2026 PhotoAvatar AI · Powered by HeyGen</span><span className="flex items-center gap-3"><span>Privacy</span><span>Terms</span><span>Support</span></span></footer>
           </div>
         </section>
